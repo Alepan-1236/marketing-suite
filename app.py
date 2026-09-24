@@ -1,6 +1,5 @@
 import streamlit as st
 import json
-import time
 import urllib.parse
 from google import genai
 from google.genai import types
@@ -71,7 +70,7 @@ PROMPT_SISTEMA = """
 Sei un Senior Performance Marketer e Direttore Creativo multicanale.
 REGOLE CRITICHE ASSOLUTE:
 1. GOOGLE ADS: 'titoli_max_30_caratteri' max 30 caratteri (spazi inclusi). 'titoli_lunghi_max_90_caratteri' e 'descrizioni_max_90_caratteri' max 90 caratteri.
-2. IMMAGINI: I prompt visivi devono essere in INGLESE e privi di scritte incorporate.
+2. IMMAGINI: I prompt visivi devono essere descrittivi, in INGLESE e privi di testi incorporati nell'immagine.
 3. Riempi rigorosamente tutti i campi dello schema JSON.
 """
 
@@ -94,30 +93,31 @@ if st.button("✨ Genera Campagna Completa", type="primary"):
     else:
         with st.spinner("Elaborazione della strategia e generazione degli asset multicanale..."):
             client = genai.Client(api_key=api_key)
+            
+            # Modelli ad alta disponibilità: gemini-3.5-flash-lite e gemini-3.5-flash
+            modelli_veloci = ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.8-flash"]
             risposta = None
             ultimo_errore = None
 
-            # Retry automatico con backoff contro i picchi temporanei (503)
-            for tentativo in range(3):
+            for mod in modelli_veloci:
                 try:
                     risposta = client.models.generate_content(
-                        model="gemini-3.8-flash",
+                        model=mod,
                         contents=f"Brief della campagna:\n\n{brief_input}",
                         config=types.GenerateContentConfig(
                             system_instruction=PROMPT_SISTEMA,
                             response_mime_type="application/json",
-                            response_schema=PacchettoCampagnaCompleta,
-                            temperature=0.2
+                            response_schema=PacchettoCampagnaCompleta
                         )
                     )
                     if risposta and risposta.text:
                         break
                 except Exception as e:
                     ultimo_errore = e
-                    time.sleep(2)  # Pausa breve per far sgonfiare il picco di traffico
+                    continue
 
             if not risposta or not risposta.text:
-                st.error(f"Errore di connessione con i server AI: {ultimo_errore}")
+                st.error(f"Errore durante l'elaborazione: {ultimo_errore}")
             else:
                 try:
                     dati = json.loads(risposta.text)
@@ -152,15 +152,15 @@ if st.button("✨ Genera Campagna Completa", type="primary"):
                             st.markdown("**Copy Facebook:**")
                             st.text_area("Facebook Copy", dati['meta_instagram_facebook']['copy_facebook'], height=150)
 
-                        st.markdown("#### Slide per Carosello")
-                        slides = dati['meta_instagram_facebook']['carosello_slide']
-                        col_slides = st.columns(min(len(slides), 4))
-                        for i, s in enumerate(slides):
-                            with col_slides[i % 4]:
-                                st.markdown(f"**Slide {s['numero']}:** {s['titolo_slide']}")
-                                st.caption(s['testo_slide'])
-                                url_slide = crea_url_immagine(s['prompt_grafica_inglese'], 800, 800)
-                                st.image(url_slide)
+                    st.markdown("#### Slide per Carosello")
+                    slides = dati['meta_instagram_facebook']['carosello_slide']
+                    col_slides = st.columns(min(len(slides), 4))
+                    for i, s in enumerate(slides):
+                        with col_slides[i % 4]:
+                            st.markdown(f"**Slide {s['numero']}:** {s['titolo_slide']}")
+                            st.caption(s['testo_slide'])
+                            url_slide = crea_url_immagine(s['prompt_grafica_inglese'], 800, 800)
+                            st.image(url_slide)
 
                     with tab_tt:
                         st.subheader("Sceneggiatura TikTok & Reels")
@@ -186,9 +186,9 @@ if st.button("✨ Genera Campagna Completa", type="primary"):
                         for tl in dati['google_ads']['titoli_lunghi_max_90_caratteri']:
                             st.code(f"{tl} ({len(tl)}/90)", language="text")
 
-                        st.markdown("##### Descrizioni (Limite 90 caratteri)")
-                        for d in dati['google_ads']['descrizioni_max_90_caratteri']:
-                            st.code(f"{d} ({len(d)}/90)", language="text")
+                    st.markdown("##### Descrizioni (Limite 90 caratteri)")
+                    for d in dati['google_ads']['descrizioni_max_90_caratteri']:
+                        st.code(f"{d} ({len(d)}/90)", language="text")
 
                 except Exception as err:
                     st.error(f"Errore nella lettura dei dati generati: {err}")
