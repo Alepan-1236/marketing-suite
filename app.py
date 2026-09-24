@@ -91,7 +91,7 @@ if st.button("✨ Genera Campagna Completa", type="primary"):
             try:
                 client = genai.Client(api_key=api_key)
                 risposta = client.models.generate_content(
-                    model="gemini-2.5-flash",
+                    model="gemini-3.8-flash",
                     contents=f"Brief della campagna:\n\n{brief}",
                     config=types.GenerateContentConfig(
                         system_instruction=PROMPT_SISTEMA,
